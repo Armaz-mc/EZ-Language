@@ -16,9 +16,16 @@ dist/
 *.out
 *.exe
 
+# Ignore python environment
+myenv/
+
+# Ignore Test files
+test/
+
 # Ignore Visual Studio Code settings
 .vscode/
 
 # Ignore OS-specific files
 .DS_Store
 Thumbs.db
+README.md

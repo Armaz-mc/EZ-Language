@@ -2,19 +2,23 @@
     THIS IS AN EXAMPLE OF A LEXER IMPLEMENTATION IN C++.
     THIS WILL NOT BE USED IN THE FINAL PROJECT.
     THIS IS JUST FOR LEARNING PURPOSES.
-    THIS IS A SIMPLE LEXER THAT CAN PARSE NUMBERS AND STRINGS.
+    THIS IS A SIMPLE LEXER THAT CAN TOKENIZE NUMBERS, STRINGS, BOOLEAN, KEYWORD AND OPERATORS.
 */
 
 #include <iostream>
 #include <cctype>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 enum class TokenType
 {
     NUMBER,
     STRING,
-    END_OF_FILE,
+    BOOLEAN,
+    OPERATOR,
+    KEYWORD,
+    END_OF_LINE,
     UNKNOWN
 };
 
@@ -31,14 +35,11 @@ public:
 
     Token getNextToken()
     {
-        while (position < input.size() && std::isspace(input[position]))
-        {
-            ++position;
-        }
+        skipWhitespace();
 
-        if (position >= input.size())
+        if (position >= input.size() || input[position] == ';')
         {
-            return {TokenType::END_OF_FILE, ""};
+            return {TokenType::END_OF_LINE, ""};
         }
 
         if (std::isdigit(input[position]))
@@ -51,10 +52,39 @@ public:
             return string();
         }
 
-        return {TokenType::UNKNOWN, std::string(1, input[position++])};
+        if (operators.find(input[position]) != operators.end())
+        {
+            return {TokenType::OPERATOR, std::string(1, input[position++])};
+        }
+
+        std::string value;
+        while (position < input.size() && !std::isspace(input[position]) && input[position] != ';')
+        {
+            value += input[position++];
+        }
+
+        if (keywords.find(value) != keywords.end())
+        {
+            return {TokenType::KEYWORD, value};
+        }
+
+        if (booleans.find(value) != booleans.end())
+        {
+            return {TokenType::BOOLEAN, value};
+        }
+
+        return {TokenType::UNKNOWN, value};
     }
 
 private:
+    void skipWhitespace()
+    {
+        while (position < input.size() && std::isspace(input[position]))
+        {
+            ++position;
+        }
+    }
+
     Token number()
     {
         std::string value;
@@ -79,15 +109,19 @@ private:
 
     std::string input;
     size_t position;
+    const std::unordered_set<char> operators = {'+', '-', '*', '/'};
+    const std::unordered_set<std::string> keywords = {"if", "else", "elif", "while", "for", "return"};
+    const std::unordered_set<std::string> booleans = {"true", "false"};
 };
 
 int main()
 {
-    std::string input = "123 \"hello world\" 456  \"C\"";
+    std::string input;
+    std::getline(std::cin, input);
     Lexer lexer(input);
     Token token;
 
-    while ((token = lexer.getNextToken()).type != TokenType::END_OF_FILE)
+    while ((token = lexer.getNextToken()).type != TokenType::END_OF_LINE)
     {
         std::cout << "Token: " << token.value << " Type: " << static_cast<int>(token.type) << std::endl;
     }

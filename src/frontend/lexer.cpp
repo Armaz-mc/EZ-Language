@@ -1,8 +1,11 @@
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
-#include <vector>
+#include <unordered_map>
 #include <unordered_set>
+#include <cctype>
+#include <stack>
 
 enum class TokenType
 {
@@ -13,7 +16,8 @@ enum class TokenType
     KEYWORD,
     IDENTIFIER,
     END_OF_LINE,
-    ERROR
+    ERROR,
+    PUNCTUATION
 };
 
 struct Token
@@ -21,22 +25,31 @@ struct Token
     TokenType type;
     std::string value;
 };
-
 class Lexer
 {
 public:
-    Lexer(const std::string &input) : input(input), position(0) {}
+    Lexer(const std::string &input) : input(input), position(0), errorReported(false) {}
 
     Token getNextToken()
     {
-        skipWhitespaceAndComments();
-
-        if (position >= input.size() || input[position] == ';')
+        if (errorReported)
         {
             return {TokenType::END_OF_LINE, ""};
         }
 
-        if (std::isdigit(input[position]))
+        skipWhitespaceAndComments();
+
+        if (position >= input.size())
+        {
+            if (!punctuationStack.empty())
+            {
+                errorReported = true;
+                return {TokenType::ERROR, "Unclosed punctuation: " + std::string(1, punctuationStack.top())};
+            }
+            return {TokenType::END_OF_LINE, ""};
+        }
+
+        if (std::isdigit(input[position]) || (input[position] == '-' && position + 1 < input.size() && std::isdigit(input[position + 1])))
         {
             return number();
         }
@@ -66,6 +79,31 @@ public:
             return {TokenType::OPERATOR, std::string(1, input[position++])};
         }
 
+        if (punctuation.find(input[position]) != punctuation.end())
+        {
+            char current = input[position++];
+            if (isOpeningPunctuation(current))
+            {
+                punctuationStack.push(current);
+            }
+            else if (isClosingPunctuation(current))
+            {
+                if (punctuationStack.empty() || !matches(punctuationStack.top(), current))
+                {
+                    errorReported = true;
+                    return {TokenType::ERROR, "Mismatched punctuation: " + std::string(1, current)};
+                }
+                punctuationStack.pop();
+            }
+            return {TokenType::PUNCTUATION, std::string(1, current)};
+        }
+
+        if (input[position] == ';')
+        {
+            position++;
+            return getNextToken(); // Ignore semicolon
+        }
+
         return errorToken();
     }
 
@@ -91,11 +129,24 @@ private:
                 else if (input[position + 1] == '*')
                 {
                     position += 2;
-                    while (position < input.size() - 1 && !(input[position] == '*' && input[position + 1] == '/'))
+                    while (position < input.size() - 1)
                     {
+                        if (input[position] == '*' && input[position + 1] == '/')
+                        {
+                            position += 2;
+                            break;
+                        }
                         position++;
                     }
-                    position += 2;
+                    if (position >= input.size() - 1)
+                    {
+                        std::cerr << "Error: Unterminated multi-line comment" << std::endl;
+                        position = input.size();
+                    }
+                }
+                else
+                {
+                    break;
                 }
             }
             else
@@ -108,7 +159,9 @@ private:
     Token number()
     {
         std::string value;
-        while (position < input.size() && std::isdigit(input[position]))
+        if (input[position] == '-')
+            value += input[position++];
+        while (position < input.size() && (std::isdigit(input[position]) || input[position] == '.'))
         {
             value += input[position++];
         }
@@ -121,6 +174,11 @@ private:
         position++;
         while (position < input.size() && input[position] != '"')
         {
+            if (input[position] == '\\' && position + 1 < input.size())
+            {
+                value += input[position];
+                position++;
+            }
             value += input[position++];
         }
         if (position >= input.size() || input[position] != '"')
@@ -156,17 +214,37 @@ private:
         return {TokenType::ERROR, "Unexpected character: " + errorChar};
     }
 
-    std::string input;
+    bool isOpeningPunctuation(char c)
+    {
+        return c == '(' || c == '{' || c == '[';
+    }
+
+    bool isClosingPunctuation(char c)
+    {
+        return c == ')' || c == '}' || c == ']';
+    }
+
+    bool matches(char opening, char closing)
+    {
+        return (opening == '(' && closing == ')') ||
+               (opening == '{' && closing == '}') ||
+               (opening == '[' && closing == ']');
+    }
+
+    const std::string input;
     size_t position;
-    const std::unordered_set<std::string> multi_char_operators = {"==", "!=", "<=", ">=", "&&", "||", "<<", ">>"};
-    const std::unordered_set<char> single_char_operators = {'+', '-', '*', '/', '%', '^', '&', '|', '!', '='};
-    const std::unordered_set<std::string> keywords = {"if", "else", "elif", "while", "for", "return"};
+    bool errorReported;
+    std::stack<char> punctuationStack;
+    const std::unordered_set<std::string> multi_char_operators = {"==", "!=", "<=", ">=", "&&", "||"};
+    const std::unordered_set<char> single_char_operators = {'+', '-', '*', '/', '%', '^', '&', '|', '!', '=', '<', '>'};
+    const std::unordered_set<char> punctuation = {':', '(', ')', '{', '}', '[', ']', ','};
+    const std::unordered_set<std::string> keywords = {"if", "else", "elif", "while", "for", "return", "doing", "public", "private", "protected", "friend", "class", "include", "extends"};
     const std::unordered_set<std::string> booleans = {"true", "false"};
 };
 
-std::string tokenTypeToString(TokenType type)
+std::string TokenTypeToString(const Token &token)
 {
-    switch (type)
+    switch (token.type)
     {
     case TokenType::NUMBER:
         return "NUMBER";
@@ -184,22 +262,40 @@ std::string tokenTypeToString(TokenType type)
         return "END_OF_LINE";
     case TokenType::ERROR:
         return "ERROR";
-    default:
-        return "UNKNOWN";
+    case TokenType::PUNCTUATION:
+        return "PUNCTUATION";
     }
+    return "";
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    std::ostringstream oss;
-    oss << std::cin.rdbuf();
-    std::string input = oss.str();
+    std::string input;
+    if (argc > 1)
+    {
+        std::ifstream file(argv[1]);
+        if (!file)
+        {
+            std::cerr << "Error: Cannot open file " << argv[1] << std::endl;
+            return 1;
+        }
+        std::ostringstream buffer;
+        buffer << file.rdbuf();
+        input = buffer.str();
+    }
+    else
+    {
+        std::ostringstream buffer;
+        buffer << std::cin.rdbuf();
+        input = buffer.str();
+    }
+
     Lexer lexer(input);
     Token token;
 
     while ((token = lexer.getNextToken()).type != TokenType::END_OF_LINE)
     {
-        std::cout << "Token: " << token.value << " Type: " << tokenTypeToString(token.type) << std::endl;
+        std::cout << "Token: " << token.value << " Type: " << TokenTypeToString(token) << std::endl;
     }
 
     return 0;

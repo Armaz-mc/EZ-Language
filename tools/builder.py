@@ -1,3 +1,9 @@
+"""
+    !MOST python files will be worked by vexato. This file is an exception.
+    !This file is a helper file to build and test the lexer and the rest of the other components. 
+    !It is not a part of the project.
+"""
+
 import subprocess
 import os
 
@@ -32,8 +38,17 @@ class Builder:
 
 
 if __name__ == "__main__":
+    existing_test_cases = ["lexer"]
+    print("Existing test cases: ", existing_test_cases)
     test_case = input("Enter test case: ")
-    test_number = int(input("Enter test number: "))
+    while test_case not in existing_test_cases:
+        print("Invalid test case. Please enter a valid test case.")
+        test_case = input("Enter test case: ")
+    try:
+        test_number = int(input("Enter test number: "))
+    except:
+        print("Invalid test number. Please enter a valid test number.")
+        exit(1)
     builder = Builder(testnumber=test_number)
     if test_case == "lexer":
         builder.lexer_build_and_test()

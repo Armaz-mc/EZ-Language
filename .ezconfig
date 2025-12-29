@@ -13,3 +13,4 @@ standard = "c++17"
 [build]
 output_dir = ".ezbuild"
 verbose = false
+no_env = true

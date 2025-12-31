@@ -146,6 +146,8 @@ int main(int argc, const char *argv[])
     envDefaults.cppStandard = config.cppStandard;
     envDefaults.outputDir = config.outputDir;
 
+    // Config file can request verbose output or skipping environment setup
+    verbose = verbose || config.verboseBuild;
     skipEnv = skipEnv || config.noEnv;
 
     bool nixPresent = skipEnv ? false : nixAvailable();

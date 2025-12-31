@@ -20,7 +20,7 @@ void greet() {
 
 // Call the functions
 int num = 5;
-double(num);
+int newNum = double(num);
 printf("double(5) = 10");
 
 isEven(4);

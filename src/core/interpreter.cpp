@@ -399,8 +399,9 @@ void SimpleInterpreter::handleVariableDeclaration(EZLanguageParser::VariableDecl
     }
 
     const std::string variableName = context.IDENTIFIER()->getText();
-    auto &currentFrame = frames.back();
-    if (currentFrame.count(variableName) != 0) {
+    const size_t frameIndex = frames.size() - 1; // capture index to avoid dangling refs if frames reallocates during evaluation
+
+    if (frames[frameIndex].count(variableName) != 0) {
         diagnostics.push_back({lineOf(context), "variable '" + variableName + "' already declared"});
         return;
     }
@@ -418,7 +419,7 @@ void SimpleInterpreter::handleVariableDeclaration(EZLanguageParser::VariableDecl
         value = *evaluated;
     }
 
-    currentFrame.emplace(variableName, value);
+    frames[frameIndex].emplace(variableName, value);
 }
 
 void SimpleInterpreter::handleExpressionStatement(EZLanguageParser::ExpressionStatementContext &context,
